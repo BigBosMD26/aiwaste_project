@@ -1,0 +1,138 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>AI Waste Classifier</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+
+<style>
+body{
+    background:#121212;
+    color:white;
+    text-align:center;
+    font-family:Arial;
+}
+
+#result{
+    font-size:32px;
+    margin:20px;
+    transition:0.3s;
+}
+
+.glow-green{
+    animation: glowGreen 1s infinite alternate;
+}
+.glow-blue{
+    animation: glowBlue 1s infinite alternate;
+}
+
+@keyframes glowGreen{
+    from{ text-shadow:0 0 10px lime; }
+    to{ text-shadow:0 0 25px lime; }
+}
+
+@keyframes glowBlue{
+    from{ text-shadow:0 0 10px cyan; }
+    to{ text-shadow:0 0 25px cyan; }
+}
+
+.bar-container{
+    width:300px;
+    background:#333;
+    margin:10px auto;
+}
+
+.bar{
+    height:20px;
+    transition:0.3s;
+}
+</style>
+</head>
+
+<body>
+
+<h1>AI Waste Classifier</h1>
+<button onclick="init()">Start</button>
+
+<div id="webcam-container"></div>
+<div id="result"></div>
+<div id="bars"></div>
+
+<audio id="organicSound" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
+<audio id="inorganicSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+
+<script>
+
+const URL = "LINK_MODEL_KAMU/"; // <-- GANTI DENGAN LINK MODEL KAMU
+
+let model, webcam;
+
+async function init(){
+    model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+
+    webcam = new tmImage.Webcam(300,300,true);
+    await webcam.setup();
+    await webcam.play();
+    window.requestAnimationFrame(loop);
+
+    document.getElementById("webcam-container").appendChild(webcam.canvas);
+}
+
+async function loop(){
+    webcam.update();
+    await predict();
+    window.requestAnimationFrame(loop);
+}
+
+async function predict(){
+    const prediction = await model.predict(webcam.canvas);
+
+    let highest = prediction.reduce((prev,current)=>
+        (prev.probability > current.probability) ? prev : current
+    );
+
+    let percent = (highest.probability * 100).toFixed(1);
+
+    let resultDiv = document.getElementById("result");
+    resultDiv.innerHTML = highest.className + " - " + percent + "%";
+    resultDiv.classList.remove("glow-green","glow-blue");
+
+    if(highest.className.toLowerCase().includes("organic")){
+        resultDiv.style.color = "lime";
+        if(highest.probability > 0.9){
+            resultDiv.classList.add("glow-green");
+            document.getElementById("organicSound").play();
+        }
+    } 
+    else if(highest.className.toLowerCase().includes("inorganic")){
+        resultDiv.style.color = "cyan";
+        if(highest.probability > 0.9){
+            resultDiv.classList.add("glow-blue");
+            document.getElementById("inorganicSound").play();
+        }
+    }
+
+    let barsHTML = "";
+    prediction.forEach(p=>{
+        let color = p.className.toLowerCase().includes("organic") ? "lime" : "cyan";
+
+        barsHTML += `
+        <div>
+            ${p.className}
+            <div class="bar-container">
+                <div class="bar" style="width:${p.probability*100}%;background:${color}"></div>
+            </div>
+        </div>
+        `;
+    });
+
+    document.getElementById("bars").innerHTML = barsHTML;
+}
+
+</script>
+
+</body>
+</html>
